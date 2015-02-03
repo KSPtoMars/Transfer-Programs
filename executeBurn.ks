@@ -17,7 +17,8 @@ SET burnTime 	TO 0. //
 SET dV 			TO NEXTNODE:DELTAV:MAG.
 
 // =========== Preliminary SetUp ===========
-LOCK STEERING TO NEXTNODE:BURNVECTOR.
+SET holdVector TO NEXTNODE:BURNVECTOR.
+LOCK STEERING TO holdVector.
 SAS OFF.
 RCS ON.
 clearscreen.
@@ -56,7 +57,7 @@ IF (MAXTHRUST = 0) {	// Can't let it go and divide by 0 now :P
 	SET flag TO false.
 
 	UNTIL flag {
-		PRINT "Burn:ETA: " + round( NEXTNODE:ETA - ( burnTime / 2 )) + "  " AT (0,7).
+		PRINT "Burn:ETA: " + round( NEXTNODE:ETA - ( burnTime / 2 ), 2) + "  " AT (0,7).
 		IF NEXTNODE:ETA < ( burnTime / 2 ) { SET flag TO true. }
 		IF ABORT = true {
 			SET flag TO true.
@@ -67,10 +68,11 @@ IF (MAXTHRUST = 0) {	// Can't let it go and divide by 0 now :P
 		SET burnTime TO time:seconds + burnTime.
 
 		PRINT "Burning.".
+		PRINT " ".
 		LOCK THROTTLE TO 1.
 		SET flag TO false.
-		SET holdVector TO NEXTNODE:BURNVECTOR.
 		UNTIL flag {
+			PRINT "Time Remaining: " + round(burnTime - time:seconds, 2) AT (0,10).
 			IF (time:seconds > burnTime) {
 				SET flag TO true.
 				PRINT "Burn Complete".
@@ -87,11 +89,12 @@ IF (MAXTHRUST = 0) {	// Can't let it go and divide by 0 now :P
 		}
 	}
 	LOCK THROTTLE TO 0.
-	WAIT 2.
 }
+SAS ON.
 UNLOCK THROTTLE.
 UNLOCK STEERING.
-
+WAIT 2.
+SAS OFF.
 
 
 
