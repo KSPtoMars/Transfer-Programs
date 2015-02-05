@@ -1,104 +1,140 @@
 // Project: KSPtoMars
 // Program: executeBurn.ks
 // 
-// Description: Universal program to execute the next burn in the flight plan.
+// Description: General use program to execute a precise burn.
 // 
-// Dependencies: 	A maneuver node must exist.
+// Dependencies: None
+//
+// Parameters: 	prograde component	:scalar
+//				radial component	:scalar
+//				normal component	:scalar
+//				start time			:absolute time (seconds)
+//				delta time			:seconds
 //
 // Notes: 	Run the program with enough time for the ship to turn towards the maneuver vector.
 //			Press the ABORT button At any point to cancel the burn.
 // 			Automatic shut down will occur if doesn't meet (or drifts away from) the maneuver vector.
 //
 
+
 // =========== Preliminary Vars ===========
-SET Fthrust 	TO 0. //total thrust of ship
-SET mi 			TO 0. //total mass rate
-SET burnTime 	TO 0. //
-SET dV 			TO NEXTNODE:DELTAV:MAG.
+SET debug TO false.
+DECLARE PARAMETER pro, rad, nor, startt, deltat.
+SET saftyFactor TO 5.
+
+SET vecPro TO prograde:vector.
+SET vecRad TO up:vector.
+SET vecNor TO VCRS(prograde:vector, up:vector).
+SET vecTar TO V(0,0,0).
 
 // =========== Preliminary SetUp ===========
-SET holdVector TO NEXTNODE:BURNVECTOR.
-LOCK STEERING TO holdVector.
-SAS OFF.
-RCS ON.
 clearscreen.
 
-LIST ENGINES IN enginList.
-FOR eng IN  enginList {
-	IF eng:IGNITION = true {
-		SET mi TO mi + ( eng:MAXTHRUST / eng:ISP ).
+IF debug {
+	//display vectors for debug
+	SET drawPro TO vecDrawArgs( V(0,0,0), V(0,0,0), RGB(1.0, 1.0, 0.1), "", 10, true ).
+	SET drawRad TO vecDrawArgs( V(0,0,0), V(0,0,0), RGB(0.4, 0.5, 1.0), "", 10, true ).
+	SET drawNor TO vecDrawArgs( V(0,0,0), V(0,0,0), RGB(1.0, 0.2, 1.0), "", 10, true ).
+	SET drawTar TO vecDrawArgs( V(0,0,0), V(0,0,0), RGB(1.0, 0.0, 0.0), "", 10, true ).
+}
+
+SAS OFF.
+RCS ON.
+SET abort to false.
+LOCK steering TO vecTar.
+
+PRINT "Prograde:  " + pro.
+PRINT "Radial:    " + rad.
+PRINT "Normal:    " + nor.
+PRINT " ".
+PRINT "Start Time:" + round(startt, 2).
+PRINT "Delta Time:" + round(deltat, 2).
+PRINT " ".
+print "hit abort at any time to cancel the burn.".
+PRINT " ".
+PRINT " ".
+
+SET flag TO false.
+UNTIL flag {
+	// =========== update vectors ===========
+	SET vecPro TO prograde:vector:normalized.
+	SET vecRad TO up:vector:normalized.
+	SET vecNor TO VCRS(prograde:vector, up:vector):normalized.
+	SET vecTar TO (vecPro * pro) + (vecRad * rad) + (vecNor * nor).
+	
+	IF debug {
+	//update debug vectors
+		SET drawPro:vec TO vecPro.
+		SET drawRad:vec TO vecRad.
+		SET drawNor:vec TO vecNor.
+		SET drawTar:vec TO vecTar.
+	}
+	
+	PRINT "Starting burn in T - " + round(startt - time:seconds,2) + " " AT (0,9).
+	
+	IF abort {
+		SET flag TO true.
+		PRINT "Manual Abort: Burn Cancelled.".
+	}
+	IF (time:seconds > startt) {
+		SET flag TO true.
 	}
 }
-IF (MAXTHRUST = 0) {	// Can't let it go and divide by 0 now :P 
-	PRINT "ERROR: 0 MAXTHRUST, Program Terminated.".
-} ELSE {
-	// =========== calculate burn time ===========
-	SET Ispg TO ( MAXTHRUST / mi ) * 9.81.
-	SET mf TO MASS / ((constant():e)^(dV / Ispg)).
-	SET mr TO MAXTHRUST / Ispg.
-	SET burnTime TO (MASS - mf) / mr.
-
-
-
-	PRINT "Ispg: " + Ispg + " m/s".
-	PRINT "Thrust: " + MAXTHRUST + " N".
-	PRINT "dm: " + ((MASS*1000) - mf) + " kg".
-	PRINT "dV: " + dV + " m/s".
-	PRINT "Burn Time: " + burnTime + " s".
+If (abort = false) {
+	LOCK throttle TO 1.0.
+	PRINT "Burning.".
 	PRINT " ".
-	PRINT " ".
-	PRINT " ".
-	PRINT "Hit ABORT at any time to cancel".
-
+	SET flag TO false.
+	
 	// =======================================
 	// 				Execute burn
 	// =======================================
-	SET ABORT TO false.
-	SET flag TO false.
-
 	UNTIL flag {
-		PRINT "Burn:ETA: " + round( NEXTNODE:ETA - ( burnTime / 2 ), 2) + "  " AT (0,7).
-		IF NEXTNODE:ETA < ( burnTime / 2 ) { SET flag TO true. }
-		IF ABORT = true {
+		PRINT "T - " + round((startt + deltat) - time:seconds, 2) + " " AT (0,11).
+		
+		IF debug {
+			//update debug vectors
+			SET drawPro:vec TO vecPro.
+			SET drawRad:vec TO vecRad.
+			SET drawNor:vec TO vecNor.
+			SET drawTar:vec TO vecTar.
+		}
+		// =========== update vectors ===========
+		SET vecPro TO prograde:vector:normalized.
+		SET vecRad TO up:vector:normalized.
+		SET vecNor TO VCRS(prograde:vector, up:vector):normalized.
+		SET vecTar TO (vecPro * pro) + (vecRad * rad) + (vecNor * nor).
+		
+		// =========== end burn conditions ===========
+		IF abort {
+			PRINT "Manual Abort: Burn Stopped.".
 			SET flag TO true.
-			PRINT "Manual Abort: Burn Cancelled.".
+		}
+		IF time:seconds > (startt + deltat) {
+			PRINT "Burn Complete.".
+			SET flag TO true.
+		}
+		IF VANG(SHIP:FACING:VECTOR,vecTar) > saftyFactor {
+			SET flag TO true.
+			PRINT "ERR: Emergency Shut-down: Bad Facing Angle".
 		}
 	}
-	IF ABORT = false {
-		SET burnTime TO time:seconds + burnTime.
-
-		PRINT "Burning.".
-		PRINT " ".
-		LOCK THROTTLE TO 1.
-		SET flag TO false.
-		UNTIL flag {
-			PRINT "Time Remaining: " + round(burnTime - time:seconds, 2) AT (0,10).
-			IF (time:seconds > burnTime) {
-				SET flag TO true.
-				PRINT "Burn Complete".
-				REMOVE NEXTNODE.
-			}
-			IF VANG(SHIP:FACING:VECTOR,holdVector) > 5 {
-				SET flag TO true.
-				PRINT "ERR: Emergency Shut-down: Bad Facing Angle".
-			}
-			IF ABORT = true {
-				PRINT "Manual Abort: Burn Stopped.".
-				SET flag TO true.
-			}
-		}
-	}
-	LOCK THROTTLE TO 0.
+	LOCK throttle TO 0.
 }
 SAS ON.
 UNLOCK THROTTLE.
 UNLOCK STEERING.
 WAIT 2.
+
+IF debug {
+	//hide debug vectors
+	SET drawPro:show TO false.
+	SET drawRad:show TO false.
+	SET drawNor:show TO false.
+	SET drawTar:show TO false.
+}
+
 SAS OFF.
-
-
-
-
 
 
 
