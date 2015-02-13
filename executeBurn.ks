@@ -3,7 +3,7 @@
 // 
 // Description: General use program to execute a precise burn.
 // 
-// Dependencies: None
+// Dependencies: None.
 //
 // Parameters: 	prograde component	:scalar
 //				radial component	:scalar
@@ -12,7 +12,7 @@
 //				delta time			:seconds
 //
 // Notes: 	Run the program with enough time for the ship to turn towards the maneuver vector.
-//			Press the ABORT button At any point to cancel the burn.
+//			Press the ABORT button at any point to cancel the burn.
 // 			Automatic shut down will occur if doesn't meet (or drifts away from) the maneuver vector.
 //
 
