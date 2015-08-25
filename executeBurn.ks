@@ -3,46 +3,41 @@
 // 
 // Description: General use program to execute a precise burn.
 // 
-// Dependencies: None.
+// Dependencies: 	stearRaw.ks   
+//					stearRawSetup.ks
 //
-// Parameters: 	prograde component	:scalar
-//				radial component	:scalar
-//				normal component	:scalar
-//				start time			:absolute time (seconds)
-//				delta time			:seconds
+// Parameters: 	prograde component	: scalar
+//				radial component	: scalar
+//				normal component	: scalar
+//				start time			: absolute time (seconds)
+//				delta time			: seconds
 //
-// Notes: 	Run the program with enough time for the ship to turn towards the maneuver vector.
+// Notes: 	Run the program with enough time for the ship to turn towards the maneuver vector (recomend 3-4 minutes minimum for large ships).
 //			Press the ABORT button at any point to cancel the burn.
-// 			Automatic shut down will occur if doesn't meet (or drifts away from) the maneuver vector.
+// 			Automatic shut down will occur if the facing vector doesn't meet (or drifts away from) the maneuver vector.
+//				To change the 'buffer' for the above, change 'saftyFactor' to the size, in degrees, that you want.
 //
 
 
-// =========== Preliminary Vars ===========
-SET debug TO false.
+// =========== Preliminary Vars and objects ===========
 DECLARE PARAMETER pro, rad, nor, startt, deltat.
-SET saftyFactor TO 5.
+SET saftyFactor TO 1.
 
-SET vecPro TO prograde:vector.
-SET vecRad TO up:vector.
-SET vecNor TO VCRS(prograde:vector, up:vector).
-SET vecTar TO V(0,0,0).
+LOCK vecPro TO prograde:vector:normalized.
+LOCK vecRad TO up:vector:normalized.
+LOCK vecNor TO VCRS(prograde:vector, up:vector):normalized.
+LOCK vecTar TO (vecPro * pro) + (vecRad * rad) + (vecNor * nor).
 
 // =========== Preliminary SetUp ===========
 clearscreen.
-
-IF debug {
-	//display vectors for debug
-	SET drawPro TO vecDrawArgs( V(0,0,0), V(0,0,0), RGB(1.0, 1.0, 0.1), "", 10, true ).
-	SET drawRad TO vecDrawArgs( V(0,0,0), V(0,0,0), RGB(0.4, 0.5, 1.0), "", 10, true ).
-	SET drawNor TO vecDrawArgs( V(0,0,0), V(0,0,0), RGB(1.0, 0.2, 1.0), "", 10, true ).
-	SET drawTar TO vecDrawArgs( V(0,0,0), V(0,0,0), RGB(1.0, 0.0, 0.0), "", 10, true ).
-}
-
 SAS OFF.
 RCS ON.
 SET abort to false.
-LOCK steering TO vecTar.
+RUN stearRawSetup.ks.
 
+// =========== Display Setup ===========
+PRINT "hit abort at any time to cancel the burn.".
+PRINT " ".
 PRINT "Prograde:  " + pro.
 PRINT "Radial:    " + rad.
 PRINT "Normal:    " + nor.
@@ -50,96 +45,64 @@ PRINT " ".
 PRINT "Start Time:" + round(startt, 2).
 PRINT "Delta Time:" + round(deltat, 2).
 PRINT " ".
-print "hit abort at any time to cancel the burn.".
 PRINT " ".
 PRINT " ".
-
+PRINT "YAW : ".
+PRINT "PIT : ".
+PRINT " ".
+// =========== wait for abort or burn to start ===========
 SET flag TO false.
 UNTIL flag {
-	// =========== update vectors ===========
-	SET vecPro TO prograde:vector:normalized.
-	SET vecRad TO up:vector:normalized.
-	SET vecNor TO VCRS(prograde:vector, up:vector):normalized.
-	SET vecTar TO (vecPro * pro) + (vecRad * rad) + (vecNor * nor).
+	run stearRaw(vecTar).
 	
-	IF debug {
-	//update debug vectors
-		SET drawPro:vec TO vecPro.
-		SET drawRad:vec TO vecRad.
-		SET drawNor:vec TO vecNor.
-		SET drawTar:vec TO vecTar.
-	}
+	PRINT "Starting burn in T - " + round(startt - time:seconds,2) + " " AT (0,9). // countdown to burn start
+	PRINT "YAW : " + (newAngPolar:X) AT (0,11).
+	PRINT "PIT : " + (newAngPolar:Y) AT (0,12).
 	
-	PRINT "Starting burn in T - " + round(startt - time:seconds,2) + " " AT (0,9).
-	
-	IF abort {
+	IF abort { // manual abort
 		SET flag TO true.
 		PRINT "Manual Abort: Burn Cancelled.".
 	}
-	IF (time:seconds > startt) {
+	IF (time:seconds >= startt) { // time to burn
 		SET flag TO true.
 	}
 }
+
+// =========== If burn not aborted ===========
 If (abort = false) {
 	LOCK throttle TO 1.0.
 	PRINT "Burning.".
 	PRINT " ".
+	PRINT " ".
 	SET flag TO false.
 	
 	// =======================================
-	// 				Execute burn
+	//				Execute burn
 	// =======================================
 	UNTIL flag {
-		PRINT "T - " + round((startt + deltat) - time:seconds, 2) + " " AT (0,11).
+		run stearRaw(vecTar).
 		
-		IF debug {
-			//update debug vectors
-			SET drawPro:vec TO vecPro.
-			SET drawRad:vec TO vecRad.
-			SET drawNor:vec TO vecNor.
-			SET drawTar:vec TO vecTar.
-		}
-		// =========== update vectors ===========
-		SET vecPro TO prograde:vector:normalized.
-		SET vecRad TO up:vector:normalized.
-		SET vecNor TO VCRS(prograde:vector, up:vector):normalized.
-		SET vecTar TO (vecPro * pro) + (vecRad * rad) + (vecNor * nor).
+		PRINT "T - " + round((startt + deltat) - time:seconds, 2) + " " AT (0,15). // countdown to burn complete
 		
 		// =========== end burn conditions ===========
-		IF abort {
+		IF abort { // manual abort
 			PRINT "Manual Abort: Burn Stopped.".
 			SET flag TO true.
 		}
-		IF time:seconds > (startt + deltat) {
+		IF time:seconds > (startt + deltat) { // burn complete
 			PRINT "Burn Complete.".
 			SET flag TO true.
 		}
-		IF VANG(SHIP:FACING:VECTOR,vecTar) > saftyFactor {
+		IF VANG(SHIP:FACING:VECTOR,vecTar) > saftyFactor { // facing error to great
 			SET flag TO true.
 			PRINT "ERR: Emergency Shut-down: Bad Facing Angle".
 		}
 	}
 	LOCK throttle TO 0.
 }
+
+// =========== clean up =========== 
 SAS ON.
-UNLOCK THROTTLE.
-UNLOCK STEERING.
+SET abort to false.
 WAIT 2.
-
-IF debug {
-	//hide debug vectors
-	SET drawPro:show TO false.
-	SET drawRad:show TO false.
-	SET drawNor:show TO false.
-	SET drawTar:show TO false.
-}
-
 SAS OFF.
-
-
-
-
-
-
-
-
