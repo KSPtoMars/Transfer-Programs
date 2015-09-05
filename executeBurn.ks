@@ -89,7 +89,7 @@ If (abort = false) {
 			PRINT "Manual Abort: Burn Stopped.".
 			SET flag TO true.
 		}
-		IF time:seconds > (startt + deltat) { // burn complete
+		IF time:seconds >= (startt + deltat) { // burn complete
 			PRINT "Burn Complete.".
 			SET flag TO true.
 		}
@@ -101,7 +101,9 @@ If (abort = false) {
 	LOCK throttle TO 0.
 }
 
-// =========== clean up =========== 
+// =========== clean up ===========
+SET SHIP:CONTROL:PITCH TO 0.
+SET SHIP:CONTROL:YAW TO 0. 
 SAS ON.
 SET abort to false.
 WAIT 2.

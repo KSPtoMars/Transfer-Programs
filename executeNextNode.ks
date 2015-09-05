@@ -20,10 +20,10 @@ SET dV 			TO NEXTNODE:DELTAV:MAG.
 
 // =========== Preliminary SetUp ===========
 SET holdVector TO NEXTNODE:BURNVECTOR.
-LOCK STEERING TO holdVector.
 SAS OFF.
 RCS ON.
 clearscreen.
+RUN stearRawSetup.
 
 LIST ENGINES IN enginList.
 FOR eng IN  enginList {
@@ -39,8 +39,6 @@ IF (MAXTHRUST = 0) {	// Can't let it go and divide by 0 now :P
 	SET mf TO MASS / ((constant():e)^(dV / Ispg)).
 	SET mr TO MAXTHRUST / Ispg.
 	SET burnTime TO (MASS - mf) / mr.
-
-
 
 	PRINT "Ispg: " + Ispg + " m/s".
 	PRINT "Thrust: " + MAXTHRUST + " N".
@@ -59,8 +57,10 @@ IF (MAXTHRUST = 0) {	// Can't let it go and divide by 0 now :P
 	SET flag TO false.
 
 	UNTIL flag {
+		RUN stearRaw(holdVector).
+		
 		PRINT "Burn:ETA: " + round( NEXTNODE:ETA - ( burnTime / 2 ), 2) + "  " AT (0,7).
-		IF NEXTNODE:ETA < ( burnTime / 2 ) { SET flag TO true. }
+		IF NEXTNODE:ETA <= ( burnTime / 2 ) { SET flag TO true. }
 		IF ABORT = true {
 			SET flag TO true.
 			PRINT "Manual Abort: Burn Cancelled.".
@@ -74,13 +74,15 @@ IF (MAXTHRUST = 0) {	// Can't let it go and divide by 0 now :P
 		LOCK THROTTLE TO 1.
 		SET flag TO false.
 		UNTIL flag {
+			RUN stearRaw(holdVector).
+			
 			PRINT "Time Remaining: " + round(burnTime - time:seconds, 2) AT (0,10).
-			IF (time:seconds > burnTime) {
+			IF (time:seconds >= burnTime) {
 				SET flag TO true.
 				PRINT "Burn Complete".
 				REMOVE NEXTNODE.
 			}
-			IF VANG(SHIP:FACING:VECTOR,holdVector) > 5 {
+			IF VANG(SHIP:FACING:VECTOR,holdVector) > 1 {
 				SET flag TO true.
 				PRINT "ERR: Emergency Shut-down: Bad Facing Angle".
 			}
