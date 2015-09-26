@@ -7,12 +7,13 @@
 // Dependencies: stearRawSetUp.ks  <- this program must be executed at some point prior to this program.
 //
 // Parameters: 	vecTar	- Type : Vector - the target vector to rotate towards
+//				speed	- Type : scaler - the max rotational speed to rotate towards the target vectar
 //
 // Notes: 	This program is designed to be called inside of a loop in another program.
 // 			stearRawSetUp.ks must be run prior to the loop containing this program.
 //
 
-DECLARE PARAMETER vecTarget.
+DECLARE PARAMETER vecTarget, speed.
 
 // Tick forward.
 SET preTickTime TO postTickTime.
@@ -42,9 +43,9 @@ if (preTickTime <> postTickTime) {
 		
 		// Target rotational speed based on difstance from target vecor
 		IF (vecTarRel:Z >= 0) { // This distinction is important for math reasons
-			SET targetdAngPolar TO -(newAngPolar / 10).
+			SET targetdAngPolar TO -((newAngPolar / 90) * speed).
 		} ELSE {
-			SET targetdAngPolar TO (newAngPolar:NORMALIZED * 10).
+			SET targetdAngPolar TO (newAngPolar:NORMALIZED * speed).
 		}
 		
 		// The direction and magnatude to activate the controles based on curent and target rotations
